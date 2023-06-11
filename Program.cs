@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Hangfire;
+using Hangfire.SqlServer;
+using api_aspnetcore6.ScheduleJobs;
 
 var builder = WebApplication.CreateBuilder(args);
 ConfigurationManager configuration = builder.Configuration;
@@ -28,6 +31,16 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 })
     .AddEntityFrameworkStores<DatabaseContext>()
     .AddDefaultTokenProviders();
+
+//Dapper
+builder.Services.AddSingleton<DapperContext>();
+
+//Hangfire
+builder.Services.AddHangfire(x =>
+{
+    x.UseSqlServerStorage(configuration.GetConnectionString("ConnStr"));
+});
+builder.Services.AddHangfireServer();
 
 // Adding Authentication
 builder.Services.AddAuthentication(options =>
@@ -86,12 +99,21 @@ builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 
+//ScheduleJobs
+builder.Services.AddSingleton<IJob, TestJob>();
+builder.Services.AddSingleton<ISendMailJob, SendMailJob>();
+
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+var sendMailService = app.Services.GetRequiredService<ISendMailJob>();
+
+//Send mail daily notification revenue
+sendMailService.RecurringJobSendMailRevenueDaily();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -104,6 +126,9 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+//Hangfire dashboards
+app.UseHangfireDashboard();
 
 app.MapControllers();
 
