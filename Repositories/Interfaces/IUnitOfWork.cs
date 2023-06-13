@@ -2,8 +2,9 @@ namespace api_aspnetcore6.Repositories.Interfaces
 {
     public interface IUnitOfWork
     {
-        ICategoryRepository Categories { get; }
         IAuthenticationRepository Users { get; }
+        ICategoryRepository Categories { get; }
+        IProductRepository Products { get; }
         void SaveChanges();
         void Rollback();
         Task SaveChangesAsync();

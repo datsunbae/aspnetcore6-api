@@ -6,8 +6,9 @@ namespace api_aspnetcore6.Repositories
     public class UnitOfWork : IUnitOfWork
     {
         private readonly DatabaseContext _dbContext;
-        private ICategoryRepository _categoryRepository;
         private IAuthenticationRepository _authenticationRepository;
+        private ICategoryRepository _categoryRepository;
+        private IProductRepository _productRepository;
         public UnitOfWork(DatabaseContext dbContext)
         {
             _dbContext = dbContext;
@@ -36,6 +37,19 @@ namespace api_aspnetcore6.Repositories
                 }
 
                 return _authenticationRepository;
+            }
+        }
+
+        public IProductRepository Products
+        {
+            get
+            {
+                if (_productRepository == null)
+                {
+                    _productRepository = new ProductRepository(_dbContext);
+                }
+
+                return _productRepository;
             }
         }
 

@@ -35,7 +35,7 @@ namespace api_aspnetcore6.Services
             await _unitOfWork.Categories.AddAsync(category);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("category");
+            _cacheService.RemoveData("categories");
 
             var response = await GetCategoryById(category.Id);
 
@@ -59,13 +59,13 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Categories.Remove(category);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("category");
+            _cacheService.RemoveData("categories");
             return id;
         }
 
         public async Task<IEnumerable<CategoryResponse>> GetAllCategories(PagingParameters pagingParameters)
         {
-            var cacheData = _cacheService.GetData<IEnumerable<CategoryResponse>>("category");
+            var cacheData = _cacheService.GetData<IEnumerable<CategoryResponse>>("categories");
             if (cacheData != null)
             {
                 cacheData = PagedList<CategoryResponse>.ToPagedList(cacheData, pagingParameters.PageNumber, pagingParameters.PageSize);
@@ -81,7 +81,7 @@ namespace api_aspnetcore6.Services
 
             cacheData = PagedList<CategoryResponse>.ToPagedList(categoriesMapper, pagingParameters.PageNumber, pagingParameters.PageSize);
 
-            _cacheService.SetData<IEnumerable<CategoryResponse>>("category", cacheData, expirationTime);
+            _cacheService.SetData<IEnumerable<CategoryResponse>>("categories", cacheData, expirationTime);
 
             return cacheData;
         }
@@ -96,7 +96,7 @@ namespace api_aspnetcore6.Services
             CategoryResponse categoryFilter = null;
 
             //Get category cache data
-            var cacheData = _cacheService.GetData<IEnumerable<CategoryResponse>>("category");
+            var cacheData = _cacheService.GetData<IEnumerable<CategoryResponse>>("categories");
             if (cacheData != null)
             {
                 categoryFilter = cacheData.Where(c => c.Id == id).FirstOrDefault();
@@ -165,7 +165,7 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Categories.Update(category);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("category");
+            _cacheService.RemoveData("categories");
 
             var response = _mapper.Map<CategoryResponse>(category);
 

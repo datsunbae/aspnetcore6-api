@@ -1,4 +1,6 @@
 using api_aspnetcore6.Dtos;
+using api_aspnetcore6.Dtos.Product;
+using api_aspnetcore6.Models;
 using api_aspnetcore6.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +19,7 @@ namespace api_aspnetcore6.Controllers
             _logger = logger;
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = $"{UserRoles.Admin}, {UserRoles.User}")]
         [HttpGet]
         public async Task<IActionResult> GetAllProducts([FromQuery] PagingParameters pagingParameters)
         {
@@ -34,9 +36,9 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = $"{UserRoles.Admin}, {UserRoles.User}")]
         [HttpGet("search")]
-        public async Task<IActionResult> SearchProduct(string? name, double? priceFrom, double? priceTo, int? idCategory,  [FromQuery] PagingParameters pagingParameters)
+        public async Task<IActionResult> SearchProduct(string? name, double? priceFrom, double? priceTo, int? idCategory, [FromQuery] PagingParameters pagingParameters)
         {
             try
             {
@@ -50,7 +52,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = $"{UserRoles.Admin}, {UserRoles.User}")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetProductById(int id)
         {
@@ -75,7 +77,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpPost]
         public async Task<IActionResult> AddProduct(ProductDTO product)
         {
@@ -97,9 +99,9 @@ namespace api_aspnetcore6.Controllers
                 return StatusCode(500, "An internal server error occurred: " + ex.Message);
             }
         }
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateProduct(int id, ProductDTO product)
+        public async Task<IActionResult> UpdateProduct(int id, ProductRequest product)
         {
             try
             {
@@ -121,7 +123,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {

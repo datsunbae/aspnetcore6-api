@@ -1,4 +1,5 @@
 using api_aspnetcore6.Dtos;
+using api_aspnetcore6.Dtos.User;
 
 namespace api_aspnetcore6.Services.Interfaces
 {

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Web;
 using api_aspnetcore6.Dtos;
+using api_aspnetcore6.Dtos.User;
 using api_aspnetcore6.Models;
 using api_aspnetcore6.Repositories.Interfaces;
 using api_aspnetcore6.Services.Interfaces;

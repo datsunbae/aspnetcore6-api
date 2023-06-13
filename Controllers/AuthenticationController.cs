@@ -1,4 +1,5 @@
 using api_aspnetcore6.Dtos;
+using api_aspnetcore6.Dtos.User;
 using api_aspnetcore6.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
