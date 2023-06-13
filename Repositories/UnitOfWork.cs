@@ -7,6 +7,7 @@ namespace api_aspnetcore6.Repositories
     {
         private readonly DatabaseContext _dbContext;
         private ICategoryRepository _categoryRepository;
+        private IAuthenticationRepository _authenticationRepository;
         public UnitOfWork(DatabaseContext dbContext)
         {
             _dbContext = dbContext;
@@ -22,6 +23,19 @@ namespace api_aspnetcore6.Repositories
                 }
 
                 return _categoryRepository;
+            }
+        }
+
+        public IAuthenticationRepository Users
+        {
+            get
+            {
+                if (_authenticationRepository == null)
+                {
+                    _authenticationRepository = new AuthenticationRepository(_dbContext);
+                }
+
+                return _authenticationRepository;
             }
         }
 
