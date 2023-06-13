@@ -1,4 +1,6 @@
 using api_aspnetcore6.Dtos;
+using api_aspnetcore6.Dtos.Category;
+using api_aspnetcore6.Models;
 using api_aspnetcore6.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,13 +19,13 @@ namespace api_aspnetcore6.Controllers
             _logger = logger;
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = $"{UserRoles.Admin}, {UserRoles.User}")]
         [HttpGet]
         public async Task<IActionResult> GetAllCategories([FromQuery] PagingParameters pagingParameters)
         {
             try
             {
-                var response = await _categoryService.GetALlCategories(pagingParameters);
+                var response = await _categoryService.GetAllCategories(pagingParameters);
                 _logger.LogInformation($"SeriLog - Category (GetAllCategories): Get all categories successfully");
                 return Ok(response);
             }
@@ -34,7 +36,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = $"{UserRoles.Admin}, {UserRoles.User}")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCategoryById(int id)
         {
@@ -59,7 +61,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = $"{UserRoles.Admin}, {UserRoles.User}")]
         [HttpGet("search")]
         public async Task<IActionResult> SearchCategory(string name, [FromQuery] PagingParameters pagingParameters)
         {
@@ -74,7 +76,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpPost]
         public async Task<IActionResult> AddCategory(CategoryDTO category)
         {
@@ -82,7 +84,7 @@ namespace api_aspnetcore6.Controllers
             {
                 if (!ModelState.IsValid)
                 {
-                    _logger.LogWarning($"SeriLog - Category (AddCategory): Category not found");
+                    _logger.LogWarning($"SeriLog - Category (AddCategory): BadRequest");
                     return BadRequest();
                 }
 
@@ -96,15 +98,15 @@ namespace api_aspnetcore6.Controllers
                 return StatusCode(500, "An internal server error occurred: " + ex.Message);
             }
         }
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateCategory(int id, CategoryDTO category)
+        public async Task<IActionResult> UpdateCategory(int id, CategoryRequest category)
         {
             try
             {
                 if (!ModelState.IsValid || id == null)
                 {
-                    _logger.LogWarning($"SeriLog - Category (UpdateCategory): Category not found");
+                    _logger.LogWarning($"SeriLog - Category (UpdateCategory): BadRequest");
                     return BadRequest();
                 }
 
@@ -120,7 +122,7 @@ namespace api_aspnetcore6.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCategory(int id)
         {
@@ -128,7 +130,7 @@ namespace api_aspnetcore6.Controllers
             {
                 if (id == null)
                 {
-                    _logger.LogWarning($"SeriLog - Category (DeleteCategory): Category not found");
+                    _logger.LogWarning($"SeriLog - Category (DeleteCategory): BadRequest");
                     return BadRequest();
                 }
 

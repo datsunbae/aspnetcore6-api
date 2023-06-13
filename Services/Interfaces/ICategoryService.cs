@@ -1,14 +1,15 @@
 using api_aspnetcore6.Dtos;
+using api_aspnetcore6.Dtos.Category;
 
 namespace api_aspnetcore6.Services.Interfaces
 {
     public interface ICategoryService
     {
-        Task<List<CategoryDTO>> GetALlCategories(PagingParameters pagingParameters);
-        Task<List<CategoryDTO>> SearchCategories(string name, PagingParameters pagingParameters);
-        Task<CategoryDTO> GetCategoryById(int id);
-        Task<CategoryDTO> AddCategory(CategoryDTO category);
-        Task<CategoryDTO> UpdateCategory(int id, CategoryDTO category);
+        Task<IEnumerable<CategoryResponse>> GetAllCategories(PagingParameters pagingParameters);
+        Task<IEnumerable<CategoryResponse>> SearchCategories(string name, PagingParameters pagingParameters);
+        Task<CategoryResponse> GetCategoryById(int id);
+        Task<CategoryResponse> AddCategory(CategoryDTO categoryDTO);
+        Task<CategoryResponse> UpdateCategory(int id, CategoryRequest categoryRequest);
         Task<int> DeleteCategory(int id);
     }
 }

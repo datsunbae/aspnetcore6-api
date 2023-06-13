@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace api_aspnetcore6.Dtos
+namespace api_aspnetcore6.Dtos.Category
 {
     public class CategoryDTO
     {
