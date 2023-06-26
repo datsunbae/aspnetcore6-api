@@ -13,8 +13,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Hangfire;
-using Hangfire.SqlServer;
 using api_aspnetcore6.ScheduleJobs;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 ConfigurationManager configuration = builder.Configuration;
@@ -31,9 +31,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 })
     .AddEntityFrameworkStores<DatabaseContext>()
     .AddDefaultTokenProviders();
-
-//Dapper
-builder.Services.AddSingleton<DapperContext>();
 
 //Hangfire
 builder.Services.AddHangfire(x =>
@@ -92,6 +89,7 @@ builder.Services.AddTransient(typeof(IGenericRepository<>), typeof(GenericReposi
 builder.Services.AddTransient<IAuthenticationRepository, AuthenticationRepository>();
 builder.Services.AddTransient<ICategoryRepository, CategoryRepository>();
 builder.Services.AddTransient<IProductRepository, ProductRepository>();
+builder.Services.AddTransient<IOrderRepository, OrderRepository>();
 builder.Services.AddTransient<IUnitOfWork, UnitOfWork>();
 
 //DI Services
@@ -100,6 +98,7 @@ builder.Services.AddScoped<ICacheService, CacheService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 //ScheduleJobs
 builder.Services.AddSingleton<IJob, TestJob>();

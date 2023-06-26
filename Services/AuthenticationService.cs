@@ -248,7 +248,8 @@ namespace api_aspnetcore6.Services
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                    new Claim("Id", Guid.NewGuid().ToString()),
+                    //new Claim("Id", Guid.NewGuid().ToString()),
+                    new Claim("Id", user.Id),
                     new Claim(ClaimTypes.Name, user.UserName),
                     new Claim(ClaimTypes.Email, user.Email),
                     new Claim(JwtRegisteredClaimNames.Jti,Guid.NewGuid().ToString()),

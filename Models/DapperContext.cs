@@ -1,16 +1,15 @@
 using System.Data;
+using api_aspnetcore6.Helpers;
 using Microsoft.Data.SqlClient;
 
 namespace api_aspnetcore6.Models
 {
-    public class DapperContext
+    public static class DapperContext
     {
-        private readonly IConfiguration _configuration;
-        public DapperContext(IConfiguration configuration)
+        public static IDbConnection CreateConnection()
         {
-            _configuration = configuration;
+            var con = ConfigurationManagers.AppSetting["ConnectionStrings:ConnStr"];
+            return new SqlConnection(con);
         }
-        public IDbConnection CreateConnection()
-          => new SqlConnection(_configuration.GetConnectionString("ConnStr"));
     }
 }

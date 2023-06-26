@@ -5,6 +5,8 @@ namespace api_aspnetcore6.Repositories.Interfaces
         IAuthenticationRepository Users { get; }
         ICategoryRepository Categories { get; }
         IProductRepository Products { get; }
+        IOrderRepository Orders { get; }
+        IOrderDetailRepository OrderDetails { get; }
         void SaveChanges();
         void Rollback();
         Task SaveChangesAsync();

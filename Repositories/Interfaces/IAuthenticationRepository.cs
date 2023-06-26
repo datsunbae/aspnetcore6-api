@@ -4,5 +4,6 @@ namespace api_aspnetcore6.Repositories.Interfaces
 {
     public interface IAuthenticationRepository : IGenericRepository<ApplicationUser>
     {
+        Task<ApplicationUser> GetUser(string userId);
     }
 }

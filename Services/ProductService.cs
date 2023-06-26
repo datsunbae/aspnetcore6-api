@@ -21,6 +21,7 @@ namespace api_aspnetcore6.Services
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _cacheService = cacheService;
+            _configuration = configuration;
         }
 
         public async Task<ProductResponse> AddProduct(ProductDTO request)
@@ -134,15 +135,15 @@ namespace api_aspnetcore6.Services
 
             if (priceFrom.HasValue && priceTo > 0)
             {
-                productsQuery = productsQuery.Where(p => p.Price == priceFrom);
+                productsQuery = productsQuery.Where(p => p.Price >= priceFrom);
             }
 
             if (priceTo.HasValue && priceFrom > 0)
             {
-                productsQuery = productsQuery.Where(p => p.Price == priceTo);
+                productsQuery = productsQuery.Where(p => p.Price <= priceTo);
             }
 
-            if (priceTo.HasValue)
+            if (idCategory.HasValue)
             {
                 productsQuery = productsQuery.Where(p => p.IdCategory == idCategory);
             }

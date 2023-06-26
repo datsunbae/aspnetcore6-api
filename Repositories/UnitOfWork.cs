@@ -9,6 +9,9 @@ namespace api_aspnetcore6.Repositories
         private IAuthenticationRepository _authenticationRepository;
         private ICategoryRepository _categoryRepository;
         private IProductRepository _productRepository;
+        private IOrderRepository _orderRepository;
+        private IOrderDetailRepository _orderDetailRepository;
+
         public UnitOfWork(DatabaseContext dbContext)
         {
             _dbContext = dbContext;
@@ -50,6 +53,32 @@ namespace api_aspnetcore6.Repositories
                 }
 
                 return _productRepository;
+            }
+        }
+
+        public IOrderRepository Orders
+        {
+            get
+            {
+                if (_orderRepository == null)
+                {
+                    _orderRepository = new OrderRepository(_dbContext);
+                }
+
+                return _orderRepository;
+            }
+        }
+
+        public IOrderDetailRepository OrderDetails
+        {
+            get
+            {
+                if (_orderDetailRepository == null)
+                {
+                    _orderDetailRepository = new OrderDetailRepository(_dbContext);
+                }
+
+                return _orderDetailRepository;
             }
         }
 

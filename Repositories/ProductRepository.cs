@@ -8,5 +8,7 @@ namespace api_aspnetcore6.Repositories
         public ProductRepository(DatabaseContext dbContext) : base(dbContext)
         {
         }
+
+
     }
 }

@@ -8,12 +8,10 @@ namespace api_aspnetcore6.ScheduleJobs
 {
     public class SendMailJob : ISendMailJob
     {
-        private readonly DapperContext _context;
         private readonly ISendMailService _sendMailJobService;
         private readonly IRecurringJobManager _recurringJobManager;
-        public SendMailJob(DapperContext context, ISendMailService sendMailService, IRecurringJobManager recurringJobManager)
+        public SendMailJob(ISendMailService sendMailService, IRecurringJobManager recurringJobManager)
         {
-            _context = context;
             _sendMailJobService = sendMailService;
             _recurringJobManager = recurringJobManager;
         }
@@ -25,7 +23,7 @@ namespace api_aspnetcore6.ScheduleJobs
 
         public async Task SendMailRevenueDaily()
         {
-            using (var connection = _context.CreateConnection())
+            using (var connection = DapperContext.CreateConnection())
             {
                 var revenue = await connection.QueryFirstOrDefaultAsync("GetDailyRevenue");
 
