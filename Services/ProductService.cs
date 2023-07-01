@@ -124,21 +124,19 @@ namespace api_aspnetcore6.Services
         {
             var products = await GetAllProducts(pagingParameters);
 
-            var productsMapper = _mapper.Map<IEnumerable<ProductResponse>>(products);
-
-            IQueryable<ProductResponse> productsQuery = productsMapper.AsQueryable();
+            IQueryable<ProductResponse> productsQuery = products.AsQueryable();
 
             if (!string.IsNullOrEmpty(name))
             {
-                productsQuery = productsQuery.Where(p => p.Name == name);
+                productsQuery = productsQuery.Where(p => p.Name.ToLower().Contains(name.ToLower()));
             }
 
-            if (priceFrom.HasValue && priceTo > 0)
+            if (priceFrom.HasValue)
             {
                 productsQuery = productsQuery.Where(p => p.Price >= priceFrom);
             }
 
-            if (priceTo.HasValue && priceFrom > 0)
+            if (priceTo.HasValue)
             {
                 productsQuery = productsQuery.Where(p => p.Price <= priceTo);
             }

@@ -123,13 +123,11 @@ namespace api_aspnetcore6.Services
         {
             var categories = await GetAllCategories(pagingParameters);
 
-            var categoriesMapper = _mapper.Map<IEnumerable<CategoryResponse>>(categories);
-
-            IQueryable<CategoryResponse> categoriesQuery = categoriesMapper.AsQueryable();
+            IQueryable<CategoryResponse> categoriesQuery = categories.AsQueryable();
 
             if (!string.IsNullOrEmpty(name))
             {
-                categoriesQuery.Where(c => c.Name == name);
+                categoriesQuery.Where(c => c.Name.ToLower().Contains(name.ToLower()));
             }
 
             return PagedList<CategoryResponse>.ToPagedList(categoriesQuery.ToList(), pagingParameters.PageNumber, pagingParameters.PageSize);
