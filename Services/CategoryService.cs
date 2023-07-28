@@ -1,12 +1,13 @@
 using System.Reflection;
-using api_aspnetcore6.Caching.Interfaces;
 using api_aspnetcore6.Dtos;
 using api_aspnetcore6.Dtos.Category;
 using api_aspnetcore6.Helper;
+using api_aspnetcore6.Helpers;
 using api_aspnetcore6.Models;
 using api_aspnetcore6.Repositories.Interfaces;
 using api_aspnetcore6.Services.Interfaces;
 using AutoMapper;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace api_aspnetcore6.Services
 {
@@ -14,14 +15,16 @@ namespace api_aspnetcore6.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
-        private readonly ICacheService _cacheService;
         private readonly IMapper _mapper;
-        public CategoryService(IUnitOfWork unitOfWork, IConfiguration configuration, ICacheService cacheService, IMapper mapper)
+        private const string categoryCacheKey = "categories";
+        private readonly IDistributedCache _cache;
+        private static readonly SemaphoreSlim semaphore = new(1, 1);
+        public CategoryService(IUnitOfWork unitOfWork, IConfiguration configuration, IDistributedCache cache, IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _configuration = configuration;
-            _cacheService = cacheService;
             _mapper = mapper;
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
         public async Task<CategoryResponse> AddCategory(CategoryDTO request)
         {
@@ -35,7 +38,7 @@ namespace api_aspnetcore6.Services
             await _unitOfWork.Categories.AddAsync(category);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("categories");
+            _cache.Remove(categoryCacheKey);
 
             var response = await GetCategoryById(category.Id);
 
@@ -59,31 +62,37 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Categories.Remove(category);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("categories");
+            _cache.Remove(categoryCacheKey);
             return id;
         }
 
         public async Task<IEnumerable<CategoryResponse>> GetAllCategories(PagingParameters pagingParameters)
         {
-            var cacheData = _cacheService.GetData<IEnumerable<CategoryResponse>>("categories");
-            if (cacheData != null)
+
+            var cacheData = _cache.TryGetValue(categoryCacheKey, out IEnumerable<CategoryResponse>? categories);
+
+            if (!cacheData)
             {
-                cacheData = PagedList<CategoryResponse>.ToPagedList(cacheData, pagingParameters.PageNumber, pagingParameters.PageSize);
-                return cacheData;
+                try
+                {
+                    await semaphore.WaitAsync();
+                    var categoryList = await _unitOfWork.Categories!.GetAllAsync();
+                    categories = _mapper.Map<IEnumerable<CategoryResponse>>(categoryList);
+
+                    var cacheEntryOptions = new DistributedCacheEntryOptions()
+                            .SetSlidingExpiration(TimeSpan.FromSeconds(60))
+                            .SetAbsoluteExpiration(TimeSpan.FromSeconds(3600));
+                    await _cache.SetAsync(categoryCacheKey, categories, cacheEntryOptions);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
             }
 
-            _ = int.TryParse(_configuration["Caching:ExpirationTime"], out int time);
-            var expirationTime = DateTimeOffset.Now.AddMinutes(time);
+            categories = PagedList<CategoryResponse>.ToPagedList(categories, pagingParameters.PageNumber, pagingParameters.PageSize);
 
-            var categories = await _unitOfWork.Categories!.GetAllAsync();
-
-            var categoriesMapper = _mapper.Map<IEnumerable<CategoryResponse>>(categories);
-
-            cacheData = PagedList<CategoryResponse>.ToPagedList(categoriesMapper, pagingParameters.PageNumber, pagingParameters.PageSize);
-
-            _cacheService.SetData<IEnumerable<CategoryResponse>>("categories", cacheData, expirationTime);
-
-            return cacheData;
+            return categories;
         }
 
         public async Task<CategoryResponse> GetCategoryById(int id)
@@ -96,22 +105,22 @@ namespace api_aspnetcore6.Services
             CategoryResponse categoryFilter = null;
 
             //Get category cache data
-            var cacheData = _cacheService.GetData<IEnumerable<CategoryResponse>>("categories");
-            if (cacheData != null)
+            var cacheData = _cache.TryGetValue(categoryCacheKey, out IEnumerable<CategoryResponse>? categories);
+            if (cacheData)
             {
-                categoryFilter = cacheData.Where(c => c.Id == id).FirstOrDefault();
-            }
+                categoryFilter = categories.Where(c => c.Id == id).FirstOrDefault();
 
-            if (categoryFilter != null)
-            {
-                return categoryFilter;
+                if (categoryFilter != null)
+                {
+                    return categoryFilter;
+                }
             }
 
             var getCategoryAsync = await _unitOfWork.Categories.GetAsync(c => c.Id == id);
 
             if (getCategoryAsync == null)
             {
-                throw new Exception("Could not find categor");
+                throw new Exception("Could not find category");
             }
 
             categoryFilter = _mapper.Map<CategoryResponse>(getCategoryAsync);
@@ -163,7 +172,7 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Categories.Update(category);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("categories");
+            _cache.Remove(categoryCacheKey);
 
             var response = _mapper.Map<CategoryResponse>(category);
 

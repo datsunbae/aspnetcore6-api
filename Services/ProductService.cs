@@ -1,12 +1,13 @@
 using System.Reflection;
-using api_aspnetcore6.Caching.Interfaces;
 using api_aspnetcore6.Dtos;
 using api_aspnetcore6.Dtos.Product;
 using api_aspnetcore6.Helper;
+using api_aspnetcore6.Helpers;
 using api_aspnetcore6.Models;
 using api_aspnetcore6.Repositories.Interfaces;
 using api_aspnetcore6.Services.Interfaces;
 using AutoMapper;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace api_aspnetcore6.Services
 {
@@ -14,14 +15,16 @@ namespace api_aspnetcore6.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
-        private readonly ICacheService _cacheService;
+        private const string productCacheKey = "products";
+        private readonly IDistributedCache _cache;
+        private static readonly SemaphoreSlim semaphore = new(1, 1);
         private readonly IMapper _mapper;
-        public ProductService(IUnitOfWork unitOfWork, IConfiguration configuration, ICacheService cacheService, IMapper mapper)
+        public ProductService(IUnitOfWork unitOfWork, IConfiguration configuration, IDistributedCache cache, IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
-            _cacheService = cacheService;
             _configuration = configuration;
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<ProductResponse> AddProduct(ProductDTO request)
@@ -36,7 +39,7 @@ namespace api_aspnetcore6.Services
             await _unitOfWork.Products.AddAsync(product);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("products");
+            _cache.Remove(productCacheKey);
 
             var response = await GetProductById(product.Id);
 
@@ -60,31 +63,36 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Products.Remove(product);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("products");
+            _cache.Remove(productCacheKey);
             return id;
         }
 
         public async Task<IEnumerable<ProductResponse>> GetAllProducts(PagingParameters pagingParameters)
         {
-            var cacheData = _cacheService.GetData<IEnumerable<ProductResponse>>("products");
-            if (cacheData != null)
+            var cacheData = _cache.TryGetValue(productCacheKey, out IEnumerable<ProductResponse>? products);
+
+            if (!cacheData)
             {
-                cacheData = PagedList<ProductResponse>.ToPagedList(cacheData, pagingParameters.PageNumber, pagingParameters.PageSize);
-                return cacheData;
+                try
+                {
+                    await semaphore.WaitAsync();
+                    var productList = await _unitOfWork.Categories!.GetAllAsync();
+                    products = _mapper.Map<IEnumerable<ProductResponse>>(productList);
+
+                    var cacheEntryOptions = new DistributedCacheEntryOptions()
+                            .SetSlidingExpiration(TimeSpan.FromSeconds(60))
+                            .SetAbsoluteExpiration(TimeSpan.FromSeconds(3600));
+                    await _cache.SetAsync(productCacheKey, products, cacheEntryOptions);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
             }
 
-            _ = int.TryParse(_configuration["Caching:ExpirationTime"], out int time);
-            var expirationTime = DateTimeOffset.Now.AddMinutes(time);
+            products = PagedList<ProductResponse>.ToPagedList(products, pagingParameters.PageNumber, pagingParameters.PageSize);
 
-            var products = await _unitOfWork.Products!.GetAllAsync();
-
-            var productsMapper = _mapper.Map<IEnumerable<ProductResponse>>(products);
-
-            cacheData = PagedList<ProductResponse>.ToPagedList(productsMapper, pagingParameters.PageNumber, pagingParameters.PageSize);
-
-            _cacheService.SetData<IEnumerable<ProductResponse>>("products", cacheData, expirationTime);
-
-            return cacheData;
+            return products;
         }
 
         public async Task<ProductResponse> GetProductById(int id)
@@ -96,19 +104,19 @@ namespace api_aspnetcore6.Services
 
             ProductResponse productFilter = null;
 
-            //Get products cache data
-            var cacheData = _cacheService.GetData<IEnumerable<ProductResponse>>("products");
-            if (cacheData != null)
+            //Get product cache data
+            var cacheData = _cache.TryGetValue(productCacheKey, out IEnumerable<ProductResponse>? products);
+            if (cacheData)
             {
-                productFilter = cacheData.Where(c => c.Id == id).FirstOrDefault();
+                productFilter = products.Where(c => c.Id == id).FirstOrDefault();
+
+                if (productFilter != null)
+                {
+                    return productFilter;
+                }
             }
 
-            if (productFilter != null)
-            {
-                return productFilter;
-            }
-
-            var getProductAsync = await _unitOfWork.Products.GetAsync(c => c.Id == id);
+            var getProductAsync = await _unitOfWork.Categories.GetAsync(c => c.Id == id);
 
             if (getProductAsync == null)
             {
@@ -186,7 +194,7 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Products.Update(product);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("products");
+            _cache.Remove(productCacheKey);
 
             var response = _mapper.Map<ProductResponse>(product);
 

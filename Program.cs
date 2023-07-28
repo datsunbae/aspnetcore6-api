@@ -1,6 +1,4 @@
 using System.Text;
-using api_aspnetcore6.Caching;
-using api_aspnetcore6.Caching.Interfaces;
 using api_aspnetcore6.Dtos;
 using api_aspnetcore6.Models;
 using api_aspnetcore6.Repositories;
@@ -14,7 +12,8 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Hangfire;
 using api_aspnetcore6.ScheduleJobs;
-using System.Text.Json.Serialization;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 ConfigurationManager configuration = builder.Configuration;
@@ -70,6 +69,13 @@ builder.Services.AddAuthorization();
 //Mapper
 builder.Services.AddAutoMapper(typeof(Program));
 
+//Redis cache
+builder.Services.AddStackExchangeRedisCache(options =>
+ {
+     options.Configuration = configuration["RedisConfiguration:ConnectionStrings"];
+     options.InstanceName = configuration["RedisConfiguration:InstanceName"];
+ });
+
 //Email
 var emailConfig = builder.Configuration
         .GetSection("EmailConfiguration")
@@ -94,7 +100,6 @@ builder.Services.AddTransient<IUnitOfWork, UnitOfWork>();
 
 //DI Services
 builder.Services.AddSingleton<ISendMailService, SendMailService>();
-builder.Services.AddScoped<ICacheService, CacheService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();

@@ -1,13 +1,14 @@
 using System.Reflection;
-using api_aspnetcore6.Caching.Interfaces;
 using api_aspnetcore6.Dtos;
 using api_aspnetcore6.Dtos.Order;
 using api_aspnetcore6.Dtos.OrderDetail;
 using api_aspnetcore6.Helper;
+using api_aspnetcore6.Helpers;
 using api_aspnetcore6.Models;
 using api_aspnetcore6.Repositories.Interfaces;
 using api_aspnetcore6.Services.Interfaces;
 using AutoMapper;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace api_aspnetcore6.Services
 {
@@ -15,17 +16,19 @@ namespace api_aspnetcore6.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
-        private readonly ICacheService _cacheService;
+        private const string orderCacheKey = "orders";
+        private readonly IDistributedCache _cache;
+        private static readonly SemaphoreSlim semaphore = new(1, 1);
         private readonly IMapper _mapper;
         private readonly ISendMailService _sendMailJobService;
 
-        public OrderService(IUnitOfWork unitOfWork, IConfiguration configuration, ICacheService cacheService, IMapper mapper, ISendMailService sendMailJobService)
+        public OrderService(IUnitOfWork unitOfWork, IConfiguration configuration, IDistributedCache cache, IMapper mapper, ISendMailService sendMailJobService)
         {
             _unitOfWork = unitOfWork;
             _configuration = configuration;
             _mapper = mapper;
-            _cacheService = cacheService;
             _sendMailJobService = sendMailJobService;
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
         public async Task<OrderResponse> AddOrder(OrderDTO request)
         {
@@ -73,7 +76,7 @@ namespace api_aspnetcore6.Services
             var message = new MailMessage(toEmail, subject, body);
             await _sendMailJobService.SendEmailAsync(message);
 
-            _cacheService.RemoveData("orders");
+            _cache.Remove(orderCacheKey);
 
             var response = await GetOrderById(orderMapper.Id);
 
@@ -82,25 +85,31 @@ namespace api_aspnetcore6.Services
 
         public async Task<IEnumerable<OrderResponse>> GetAllOrders(PagingParameters pagingParameters)
         {
-            var cacheData = _cacheService.GetData<IEnumerable<OrderResponse>>("orders");
-            if (cacheData != null)
+
+            var cacheData = _cache.TryGetValue(orderCacheKey, out IEnumerable<OrderResponse>? orders);
+
+            if (!cacheData)
             {
-                cacheData = PagedList<OrderResponse>.ToPagedList(cacheData, pagingParameters.PageNumber, pagingParameters.PageSize);
-                return cacheData;
+                try
+                {
+                    await semaphore.WaitAsync();
+                    var orderList = await _unitOfWork.Orders!.GetOrdersIncludeOrderDetails();
+                    orders = MapperListOrderResponse(orderList.ToList());
+
+                    var cacheEntryOptions = new DistributedCacheEntryOptions()
+                            .SetSlidingExpiration(TimeSpan.FromSeconds(60))
+                            .SetAbsoluteExpiration(TimeSpan.FromSeconds(3600));
+                    await _cache.SetAsync(orderCacheKey, orders, cacheEntryOptions);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
             }
 
-            _ = int.TryParse(_configuration["Caching:ExpirationTime"], out int time);
-            var expirationTime = DateTimeOffset.Now.AddMinutes(time);
+            orders = PagedList<OrderResponse>.ToPagedList(orders, pagingParameters.PageNumber, pagingParameters.PageSize);
 
-            var orders = await _unitOfWork.Orders!.GetOrdersIncludeOrderDetails();
-
-            var orderResponse = MapperListOrderResponse(orders.ToList());
-
-            cacheData = PagedList<OrderResponse>.ToPagedList(orderResponse, pagingParameters.PageNumber, pagingParameters.PageSize);
-
-            _cacheService.SetData<IEnumerable<OrderResponse>>("orders", cacheData, expirationTime);
-
-            return cacheData;
+            return orders;
         }
 
         public async Task<OrderResponse> GetOrderById(int id)
@@ -112,42 +121,43 @@ namespace api_aspnetcore6.Services
 
             OrderResponse orderFilter = null;
 
-            var cacheData = _cacheService.GetData<IEnumerable<OrderResponse>>("orders");
-
-            if (cacheData != null)
+            //Get product cache data
+            var cacheData = _cache.TryGetValue(orderCacheKey, out IEnumerable<OrderResponse>? orders);
+            if (cacheData)
             {
-                orderFilter = cacheData.Where(o => o.Id == id).FirstOrDefault();
+                orderFilter = orders.Where(c => c.Id == id).FirstOrDefault();
+
+                if (orderFilter != null)
+                {
+                    return orderFilter;
+                }
             }
 
-            if (orderFilter != null)
+            var getOrderAsync = await _unitOfWork.Orders.GetOrderByIdAsync(id);
+
+            if (getOrderAsync == null)
             {
-                return orderFilter;
+                throw new Exception("Could not find order");
             }
 
-            var order = await _unitOfWork.Orders.GetOrderByIdAsync(id);
-            if (order == null)
-            {
-                throw new Exception("Order not found");
-            }
+            orderFilter = MapperOrderResponse(getOrderAsync);
 
-            var response = MapperOrderResponse(order);
-
-            return response;
+            return orderFilter;
         }
 
         public async Task<IEnumerable<OrderResponse>> GetOrderByUserId(string userId, PagingParameters pagingParameters)
         {
-            var cacheData = _cacheService.GetData<IEnumerable<OrderResponse>>("orders");
-            if (cacheData != null)
+            var cacheData = _cache.TryGetValue(orderCacheKey, out IEnumerable<OrderResponse>? orders);
+            if (cacheData)
             {
-                cacheData = cacheData.Where(o => o.UserId == userId).ToList();
-                cacheData = PagedList<OrderResponse>.ToPagedList(cacheData, pagingParameters.PageNumber, pagingParameters.PageSize);
-                return cacheData;
+                orders = orders.Where(o => o.UserId == userId).ToList();
+                orders = PagedList<OrderResponse>.ToPagedList(orders, pagingParameters.PageNumber, pagingParameters.PageSize);
+                return orders;
             }
 
-            var orders = await _unitOfWork.Orders.GetOrdersIncludeOrderDetailsOfUser(userId);
+            var orderList = await _unitOfWork.Orders.GetOrdersIncludeOrderDetailsOfUser(userId);
 
-            var orderResponse = MapperListOrderResponse(orders.ToList());
+            var orderResponse = MapperListOrderResponse(orderList.ToList());
 
             return PagedList<OrderResponse>.ToPagedList(orderResponse, pagingParameters.PageNumber, pagingParameters.PageSize); ;
         }
@@ -210,7 +220,7 @@ namespace api_aspnetcore6.Services
             _unitOfWork.Orders.Update(order);
             await _unitOfWork.SaveChangesAsync();
 
-            _cacheService.RemoveData("orders");
+            _cache.Remove(orderCacheKey);
 
             var response = MapperOrderResponse(order);
 
